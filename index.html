@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Bacateando — Entre calles y recuerdos</title>
+<meta property="og:title" content="Bacateando — Entre calles y recuerdos">
+<meta property="og:description" content="Catálogo fotográfico Bacateando. SENA, Fotografía y Procesos Digitales, 2026.">
+<meta property="og:image" content="img/p00.jpg">
+<style>
+:root{color-scheme:light}
+[hidden]{display:none!important}
+body{margin:0;font-size:14px}
+img{max-width:100%}
+</style>
+<style>
+/* Layout: cabecera fija mínima y las láminas del catálogo apiladas a ancho completo; visor ampliado al tocar. */
+:root{
+  --bg:#ffffff; --fg:#1b1b1b; --muted:#6a6a6a; --line:#e3e3e3; --bar:rgba(255,255,255,.94);
+  --accent:#f2b705; --ov:rgba(10,10,10,.96); --ovfg:#f4f4f4;
+  --font:"Inter",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#121212; --fg:#f2f2f2; --muted:#a0a0a0; --line:#2b2b2b; --bar:rgba(18,18,18,.94); color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#121212; --fg:#f2f2f2; --muted:#a0a0a0; --line:#2b2b2b; --bar:rgba(18,18,18,.94); color-scheme:dark}
+
+body{background:var(--bg);color:var(--fg);font-family:var(--font);padding-block:0 24px;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);background:var(--bar);z-index:10}
+
+.top{position:sticky;top:env(safe-area-inset-top,0px);z-index:9;background:var(--bar);backdrop-filter:blur(8px);
+  display:flex;align-items:baseline;justify-content:space-between;gap:12px;flex-wrap:wrap;
+  margin-inline:calc(-1*max(16px,env(safe-area-inset-left,0px)));padding:10px max(16px,env(safe-area-inset-right,0px)) 10px max(16px,env(safe-area-inset-left,0px));
+  border-bottom:1px solid var(--line)}
+.top h1{font-size:1.05rem;font-weight:700;letter-spacing:.01em;margin:0}
+.top h1 span{font-weight:400;color:var(--muted);margin-left:.5em}
+.top p{margin:0;font-size:.8rem;color:var(--muted)}
+
+main{max-width:1500px;margin:0 auto;display:flex;flex-direction:column;gap:12px;padding-top:14px}
+.pg{margin:0;border:0;padding:0;background:none;width:100%;display:block;cursor:zoom-in;text-align:left}
+.pg img{display:block;width:100%;height:auto;aspect-ratio:1312/473;background:var(--line);border:1px solid var(--line)}
+.pg:focus-visible,.lb button:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+
+/* visor ampliado */
+.lb{position:fixed;inset:0;z-index:50;background:var(--ov);color:var(--ovfg);display:flex;flex-direction:column}
+.lb[hidden]{display:none!important}
+.lb-bar{display:flex;align-items:center;justify-content:space-between;gap:12px;
+  padding:calc(10px + env(safe-area-inset-top,0px)) max(14px,env(safe-area-inset-right,0px)) 10px max(14px,env(safe-area-inset-left,0px))}
+.lb-bar span{font-size:.9rem;font-variant-numeric:tabular-nums}
+.lb-bar small{color:#bdbdbd;font-size:.75rem;display:block;margin-top:2px}
+.lb button{font:inherit;color:inherit;background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.22);border-radius:8px;
+  min-height:44px;min-width:44px;padding:0 14px;cursor:pointer;font-size:.9rem}
+.lb button:disabled{opacity:.35;cursor:default}
+.lb-scroll{flex:1;min-height:0;overflow:auto;display:flex;touch-action:pan-x pan-y pinch-zoom;-webkit-overflow-scrolling:touch}
+.lb-scroll img{display:block;margin:auto;width:max(100%,900px);height:auto;max-width:none;background:#fff;flex:none}
+.lb-nav{display:flex;justify-content:center;gap:10px;
+  padding:10px max(14px,env(safe-area-inset-right,0px)) calc(12px + env(safe-area-inset-bottom,0px)) max(14px,env(safe-area-inset-left,0px))}
+.lb-nav button{flex:1;max-width:200px}
+@media (min-width:1100px){.lb-scroll img{width:100%}}
+</style>
+</head>
+<body>
+<header class="top">
+  <h1>Bacateando<span>Entre calles y recuerdos</span></h1>
+  <p>Toca una lámina para ampliarla</p>
+</header>
+<main id="pages" aria-label="Láminas del catálogo"></main>
+
+<div class="lb" id="lb" hidden role="dialog" aria-modal="true" aria-label="Lámina ampliada">
+  <div class="lb-bar">
+    <div><span id="lbCount"></span><small>Desliza para recorrer la lámina</small></div>
+    <button id="lbClose" type="button">Cerrar ✕</button>
+  </div>
+  <div class="lb-scroll" id="lbScroll"><img id="lbImg" alt=""></div>
+  <div class="lb-nav">
+    <button id="lbPrev" type="button">← Anterior</button>
+    <button id="lbNext" type="button">Siguiente →</button>
+  </div>
+</div>
+
+<script>
+(function(){
+  var N = 31;   // 0 = portada, 1..30 = catálogo
+  var pad = function(i){ return (i<10?'0':'')+i; };
+  var src = function(i){ return 'img/p'+pad(i)+'.jpg'; };
+  var label = function(i){ return i===0 ? 'Portada' : 'Lámina '+i+' de '+(N-1); };
+  var main = document.getElementById('pages');
+  var cur = 0;
+
+  for(var i=0;i<N;i++){
+    var b = document.createElement('button');
+    b.type='button'; b.className='pg'; b.setAttribute('aria-label','Ampliar: '+label(i)); b.dataset.i=i;
+    var im = document.createElement('img');
+    im.src = src(i); im.alt = label(i); im.decoding='async';
+    if(i>1) im.loading='lazy';
+    im.width=1312; im.height=473;
+    b.appendChild(im); main.appendChild(b);
+  }
+
+  var lb=document.getElementById('lb'), lbImg=document.getElementById('lbImg'),
+      lbCount=document.getElementById('lbCount'), prev=document.getElementById('lbPrev'),
+      next=document.getElementById('lbNext'), sc=document.getElementById('lbScroll'), opener=null;
+
+  function show(i){
+    cur=Math.max(0,Math.min(N-1,i));
+    lbImg.src=src(cur); lbImg.alt=label(cur);
+    lbCount.textContent=label(cur);
+    prev.disabled=cur===0; next.disabled=cur===N-1;
+    sc.scrollTo(0,0);
+  }
+  function open(i,from){ opener=from||null; show(i); lb.hidden=false; document.body.style.overflow='hidden'; document.getElementById('lbClose').focus(); }
+  function close(){ lb.hidden=true; document.body.style.overflow=''; if(opener){ opener.focus({preventScroll:true}); } }
+
+  main.addEventListener('click',function(e){ var b=e.target.closest('.pg'); if(b) open(+b.dataset.i,b); });
+  document.getElementById('lbClose').onclick=close;
+  prev.onclick=function(){ show(cur-1); };
+  next.onclick=function(){ show(cur+1); };
+  lb.addEventListener('click',function(e){ if(e.target===lb) close(); });
+  document.addEventListener('keydown',function(e){
+    if(lb.hidden) return;
+    if(e.key==='Escape') close();
+    else if(e.key==='ArrowLeft') show(cur-1);
+    else if(e.key==='ArrowRight') show(cur+1);
+  });
+})();
+</script>
+</body>
+</html>
